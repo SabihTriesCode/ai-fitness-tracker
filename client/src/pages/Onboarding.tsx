@@ -17,7 +17,7 @@ import { ageRanges, goalOptions } from "../assets/assets";
 import Slider from "../components/ui/Slider";
 
 const Onboarding = () => {
-  const [step, setStep] = useState(3);
+  const [step, setStep] = useState(1);
   const { user, setOnboardingCompleted, fetchUser } = useAppContext();
 
   const [formData, setFormData] = useState<ProfileFormData>({
@@ -38,26 +38,32 @@ const Onboarding = () => {
       ) {
         return toast("Age is required");
       }
-      if (step < totalSteps) {
-        setStep(step + 1);
-      } else {
-        const userData = {
-          ...formData,
-          age: formData.age,
-          weight: formData.weight,
-          height: formData.height ? formData.height : null,
-          createdAt: new Date().toISOString(),
-        };
-        localStorage.setItem("fitnessUser", JSON.stringify(userData));
-        await mockApi.user.update(
-          user?.id || "",
-          userData as unknown as Partial<UserData>,
-        );
-        toast.success("Profile updated successfully");
-        setOnboardingCompleted(true);
-        fetchUser(user?.token || "");
-      }
     }
+
+    if (step === 2 && !formData.weight) {
+      return toast("Weight is required");
+    }
+
+    if (step < totalSteps) {
+      setStep(step + 1);
+      return;
+    }
+
+    const userData = {
+      ...formData,
+      age: formData.age,
+      weight: formData.weight,
+      height: formData.height ? formData.height : null,
+      createdAt: new Date().toISOString(),
+    };
+    localStorage.setItem("fitnessUser", JSON.stringify(userData));
+    await mockApi.user.update(
+      user?.id || "",
+      userData as unknown as Partial<UserData>,
+    );
+    toast.success("Profile updated successfully");
+    setOnboardingCompleted(true);
+    fetchUser(user?.token || "");
   };
 
   const totalSteps = 3;
