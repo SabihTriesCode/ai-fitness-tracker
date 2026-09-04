@@ -18,8 +18,9 @@ import {
 } from "lucide-react";
 import Input from "../components/ui/Input";
 import Select from "../components/ui/Select";
-import mockApi from "../assets/mockApi";
+
 import toast from "react-hot-toast";
+import api from "../configs/api";
 
 const FoodLog = () => {
   const { allFoodLogs, setAllFoodLogs } = useAppContext();
@@ -34,10 +35,24 @@ const FoodLog = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { data } = await mockApi.foodLogs.create({ data: formData });
-    setAllFoodLogs((prev) => [...prev, data]);
-    setFormData({ name: "", calories: 0, mealType: "" });
-    setShowForm(false);
+
+    if (
+      !formData.name.trim() ||
+      !formData.calories ||
+      formData.calories <= 0 ||
+      !formData.mealType
+    ) {
+      return toast.error("Please enter a valid data");
+    }
+    try {
+      const { data } = await api.post("/api/food-logs", { data: formData });
+      setAllFoodLogs((prev) => [...prev, data]);
+      setFormData({ name: "", calories: 0, mealType: "" });
+      setShowForm(false);
+    } catch (error: any) {
+      console.log(error);
+      toast.error(error?.response?.data?.error?.message || error?.message);
+    }
   };
 
   const today = new Date().toISOString().split("T")[0];
@@ -74,21 +89,56 @@ const FoodLog = () => {
         "Are you sure you want to delete this entry?",
       );
       if (!confirm) return;
-      await mockApi.foodLogs.delete(documentId);
+      await api.delete(`/api/food-logs/${documentId}`);
       setAllFoodLogs((prev) => prev.filter((e) => e.documentId !== documentId));
     } catch (error: any) {
       console.log(error);
-      toast.error(error?.message || "Failed to delete food");
+      toast.error(error?.response?.data?.error?.message || error?.message);
     }
   };
 
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>)=> {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if(!file) return;
-    //implement image analysis
+    if (!file) return;
+    setLoading(true);
+    const formData = new FormData();
+    formData.append("image", file);
+    try {
+      const { data } = await api.post("/api/image-analysis", formData);
+      const result = data.result;
+      let mealType = "";
 
+      const hour = new Date().getHours();
+      if (hour >= 0 && hour < 12) {
+        mealType = "breakfast";
+      } else if (hour >= 12 && hour < 16) {
+        mealType = "lunch";
+      } else if (hour >= 16 && hour < 18) {
+        mealType = "snack";
+      } else if (hour >= 18 && hour < 24) {
+        mealType = "dinner";
+      }
 
-  }
+      if (!mealType || !result.name || !result.calories) {
+        return toast.error("Missing data");
+      }
+      //save result to database
+      const { data: newEntry } = await api.post("/api/food-logs", {
+        data: { name: result.name, calories: result.calories, mealType },
+      });
+      setAllFoodLogs((prev) => [...prev, newEntry]);
+
+      // reset input
+      if (inputRef.current) {
+        inputRef.current.value = "";
+      }
+    } catch (error: any) {
+      console.log(error);
+      toast.error(error?.response?.data?.error?.message || error?.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     (() => {
@@ -157,7 +207,13 @@ const FoodLog = () => {
               <SparkleIcon className="size-5" />
               AI Food Snap
             </Button>
-            <input type="file" onChange={handleImageChange} accept="image/*" hidden ref={inputRef} />
+            <input
+              type="file"
+              onChange={handleImageChange}
+              accept="image/*"
+              hidden
+              ref={inputRef}
+            />
             {loading && (
               <div className="fixed inset-0 bg-slate-100/50 dark:bg-slate-900/50 backdrop-blur flex items-center justify-center z-100">
                 <Loader2Icon className="size-6 text-emerald-600 dark:text-emerald-400 animate-spin" />

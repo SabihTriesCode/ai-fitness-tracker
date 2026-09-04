@@ -9,12 +9,13 @@ import {
 import { useState } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import { useAppContext } from "../context/AppContext";
-import type { ProfileFormData, UserData } from "../types";
+import type { ProfileFormData } from "../types";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
-import mockApi from "../assets/mockApi";
+
 import { ageRanges, goalOptions } from "../assets/assets";
 import Slider from "../components/ui/Slider";
+import api from "../configs/api";
 
 const Onboarding = () => {
   const [step, setStep] = useState(1);
@@ -57,13 +58,17 @@ const Onboarding = () => {
       createdAt: new Date().toISOString(),
     };
     localStorage.setItem("fitnessUser", JSON.stringify(userData));
-    await mockApi.user.update(
-      user?.id || "",
-      userData as unknown as Partial<UserData>,
-    );
-    toast.success("Profile updated successfully");
+    try {
+      await api.put(`/api/users/${user?.id}`, userData)
+      toast.success("Profile updated successfully");
     setOnboardingCompleted(true);
     fetchUser(user?.token || "");
+    } catch (error: any) {
+      console.log(error)
+      toast.error(error.message)
+      
+    }
+    
   };
 
   const totalSteps = 3;
